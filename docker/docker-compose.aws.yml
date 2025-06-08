@@ -264,6 +264,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_SCHEMA: _analytics
       DB_SSL: "true"
+      DB_OPTS: "sslmode=require"
       LOGFLARE_API_KEY: ${LOGFLARE_API_KEY}
       LOGFLARE_SINGLE_TENANT: true
       LOGFLARE_SUPABASE_MODE: true
