@@ -1,3 +1,19 @@
+# This compose file is a derivative of the original supabase compose file with the goal of running the supabase stack on AWS (RDS database + EC2 instance with rest of services).
+# Changes:
+# - Removed db service and health dependencies to other services -> Using RDS instead of local postgres
+# - Applied all migrations from supabase/postgres github repo and all db volumes from original compose file to RDS from within EC2 User data script
+# - Added ssl and certs required to all database connection strings
+#     - This solves the issue of the containers not being able to connect to RDS (with errors like SELF_SIGNED_CERT_IN_CHAIN or FATAL: no pg_hba.conf entry … no encryption)
+#     - Download the AWS RDS root CA and point DATABASE_URL to it
+#     - curl -o rds-ca.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+# - Added s3 docker compose definitions for storage and imgproxy services
+# - Exclude supavisor service (not needed for AWS in favor of RDS pooler)
+# - Exclude analytics service (in favor of AWS CloudWatch)
+# - Add GOTRUE_MAILER_EXTERNAL_HOSTS: ${SITE_URL} to auth service for email sending to work
+# TODO:
+# - Add realtime
+# - Add functions
+
 name: supabase
 
 services:
@@ -90,7 +106,7 @@ services:
       API_EXTERNAL_URL: ${API_EXTERNAL_URL}
 
       GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=require
+      GOTRUE_DB_DATABASE_URL: "postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=require&sslrootcert=/etc/ssl/certs/rds-ca.pem"
 
       GOTRUE_SITE_URL: ${SITE_URL}
       GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS}
@@ -145,6 +161,8 @@ services:
       # GOTRUE_HOOK_SEND_EMAIL_ENABLED: "false"
       # GOTRUE_HOOK_SEND_EMAIL_URI: "http://host.docker.internal:54321/functions/v1/email_sender"
       # GOTRUE_HOOK_SEND_EMAIL_SECRETS: "v1,whsec_VGhpcyBpcyBhbiBleGFtcGxlIG9mIGEgc2hvcnRlciBCYXNlNjQgc3RyaW5n"
+    volumes:
+      - ./rds-ca.pem:/etc/ssl/certs/rds-ca.pem:ro
 
   rest:
     container_name: supabase-rest
@@ -154,7 +172,7 @@ services:
     #   analytics:
     #     condition: service_healthy
     environment:
-      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=require
+      PGRST_DB_URI: "postgres://authenticator:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=require&sslrootcert=/etc/ssl/certs/rds-ca.pem"
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
       PGRST_DB_ANON_ROLE: anon
       PGRST_JWT_SECRET: ${JWT_SECRET}
@@ -165,6 +183,8 @@ services:
       [
         "postgrest"
       ]
+    volumes:
+      - ./rds-ca.pem:/etc/ssl/certs/rds-ca.pem:ro
 
   storage:
     container_name: supabase-storage
@@ -193,7 +213,7 @@ services:
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
       POSTGREST_URL: http://rest:3000
       PGRST_JWT_SECRET: ${JWT_SECRET}
-      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=require&sslrootcert=/etc/ssl/certs/rds-ca.pem
+      DATABASE_URL: "postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=require&sslrootcert=/etc/ssl/certs/rds-ca.pem"
       FILE_SIZE_LIMIT: 52428800
       STORAGE_BACKEND: s3
       GLOBAL_S3_BUCKET: ${GLOBAL_S3_BUCKET}
@@ -209,9 +229,6 @@ services:
       IMGPROXY_URL: http://imgproxy:5001
     volumes:
       - ./volumes/storage:/var/lib/storage:z
-      # This solves the issue of the storage container not being able to connect to RDS with error SELF_SIGNED_CERT_IN_CHAIN
-      # Download the AWS RDS root CA and point DATABASE_URL to it
-      # curl -o rds-ca.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
       - ./rds-ca.pem:/etc/ssl/certs/rds-ca.pem:ro
 
   imgproxy:
@@ -236,11 +253,9 @@ services:
     #     condition: service_healthy
     environment:
       PG_META_PORT: 8080
-      PG_META_DB_HOST: ${POSTGRES_HOST}
-      PG_META_DB_PORT: ${POSTGRES_PORT}
-      PG_META_DB_NAME: ${POSTGRES_DB}
-      PG_META_DB_USER: supabase_admin
-      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      PG_META_DB_URL: "postgres://supabase_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=require&sslrootcert=/etc/ssl/certs/rds-ca.pem"
+    volumes:
+      - ./rds-ca.pem:/etc/ssl/certs/rds-ca.pem:ro
 
 
   # analytics:
