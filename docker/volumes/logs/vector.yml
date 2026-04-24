@@ -172,97 +172,53 @@ transforms:
       .metadata.parsed.error_severity = upcase!(.metadata.parsed.error_severity)
 
 sinks:
-  logflare_auth:
-    type: 'http'
+  auth_file:
+    type: file
     inputs:
       - auth_logs
+    path: /var/log/vector/auth.log
     encoding:
-      codec: 'json'
-    method: 'post'
-    request:
-      retry_max_duration_secs: 30
-      retry_initial_backoff_secs: 1
-      headers:
-        x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
-    uri: 'http://analytics:4000/api/logs?source_name=gotrue.logs.prod'
-  logflare_realtime:
-    type: 'http'
+      codec: json
+  realtime_file:
+    type: file
     inputs:
       - realtime_logs
+    path: /var/log/vector/realtime.log
     encoding:
-      codec: 'json'
-    method: 'post'
-    request:
-      retry_max_duration_secs: 30
-      retry_initial_backoff_secs: 1
-      headers:
-        x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
-    uri: 'http://analytics:4000/api/logs?source_name=realtime.logs.prod'
-  logflare_rest:
-    type: 'http'
+      codec: json
+  rest_file:
+    type: file
     inputs:
       - rest_logs
+    path: /var/log/vector/rest.log
     encoding:
-      codec: 'json'
-    method: 'post'
-    request:
-      retry_max_duration_secs: 30
-      retry_initial_backoff_secs: 1
-      headers:
-        x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
-    uri: 'http://analytics:4000/api/logs?source_name=postgREST.logs.prod'
-  logflare_db:
-    type: 'http'
+      codec: json
+  db_file:
+    type: file
     inputs:
       - db_logs
+    path: /var/log/vector/db.log
     encoding:
-      codec: 'json'
-    method: 'post'
-    request:
-      retry_max_duration_secs: 30
-      retry_initial_backoff_secs: 1
-      headers:
-        x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
-    # Route directly to analytics like other sinks. Retry handles the startup
-    # race where analytics may not be ready yet when early DB logs arrive.
-    uri: 'http://analytics:4000/api/logs?source_name=postgres.logs'
-  logflare_functions:
-    type: 'http'
+      codec: json
+  functions_file:
+    type: file
     inputs:
       - functions_logs
+    path: /var/log/vector/functions.log
     encoding:
-      codec: 'json'
-    method: 'post'
-    request:
-      retry_max_duration_secs: 30
-      retry_initial_backoff_secs: 1
-      headers:
-        x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
-    uri: 'http://analytics:4000/api/logs?source_name=deno-relay-logs'
-  logflare_storage:
-    type: 'http'
+      codec: json
+  storage_file:
+    type: file
     inputs:
       - storage_logs
+    path: /var/log/vector/storage.log
     encoding:
-      codec: 'json'
-    method: 'post'
-    request:
-      retry_max_duration_secs: 30
-      retry_initial_backoff_secs: 1
-      headers:
-        x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
-    uri: 'http://analytics:4000/api/logs?source_name=storage.logs.prod.2'
-  logflare_kong:
-    type: 'http'
+      codec: json
+  kong_file:
+    type: file
     inputs:
       - kong_logs
       - kong_err
+    path: /var/log/vector/kong.log
     encoding:
-      codec: 'json'
-    method: 'post'
-    request:
-      retry_max_duration_secs: 30
-      retry_initial_backoff_secs: 1
-      headers:
-        x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
-    uri: 'http://analytics:4000/api/logs?source_name=cloudflare.logs.prod'
+      codec: json

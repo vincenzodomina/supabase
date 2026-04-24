@@ -6,10 +6,19 @@
 #     - This solves the issue of the containers not being able to connect to RDS (with errors like SELF_SIGNED_CERT_IN_CHAIN or FATAL: no pg_hba.conf entry … no encryption)
 #     - Download the AWS RDS root CA and point DATABASE_URL to it
 #     - curl -o rds-ca.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
-# - Added s3 docker compose definitions for storage and imgproxy services
-# - Exclude supavisor service (not needed for AWS in favor of RDS pooler)
-# - Exclude analytics service (in favor of AWS CloudWatch)
-# - Add GOTRUE_MAILER_EXTERNAL_HOSTS: ${GOTRUE_MAILER_EXTERNAL_HOSTS} to auth service for email sending to work
+# - Added S3-backed storage/imgproxy configuration for AWS S3 instead of the local
+#   MinIO overlay.
+# - Exclude supavisor service (not needed for AWS in favor of the RDS / external pooler).
+# - Exclude analytics / Logflare service and Studio log UI wiring; CloudWatch handles
+#   container log collection instead.
+# - Keep vector, but use local file sinks under ./logs/vector so CloudWatch can ingest
+#   parsed service logs without depending on analytics:4000.
+# - Added templates-server plus Auth mailer template and subject wiring for hosted
+#   email templates.
+# - Add GOTRUE_MAILER_EXTERNAL_HOSTS: ${GOTRUE_MAILER_EXTERNAL_HOSTS} to auth service
+#   for email sending to work.
+# - Added explicit postgres-meta SSL handling for RDS (verify-full, CA bundle mount,
+#   extracted root cert at startup).
 # Upstream changelog since this AWS fork was introduced:
 # - Base fork point is roughly the 2026-01-27 docker stack.
 # - 2026-02-16: upstream changed storage and analytics configuration, including
@@ -21,6 +30,9 @@
 # - 2026-04-08: upstream bumped Studio/PostgREST/Storage/Postgres Meta,
 #   renamed IMGPROXY_ENABLE_WEBP_DETECTION to IMGPROXY_AUTO_WEBP, and added
 #   SAML/PG17-related self-hosting updates.
+# - 2026-04-24: this AWS fork synced the upstream Jan->Apr docker changes, restored
+#   vector as an AWS-native log processor, removed remaining Logflare / Studio log UI
+#   coupling, and kept CloudWatch as the log shipping destination.
 # TODO:
 # - Add realtime
 # - Add functions
@@ -439,6 +451,35 @@ services:
 
     volumes:
       - ./rds-ca.pem:/etc/ssl/certs/rds-ca.pem:ro
+
+  vector:
+    container_name: supabase-vector
+    image: timberio/vector:0.53.0-alpine
+    restart: unless-stopped
+    volumes:
+      - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro,z
+      - ${DOCKER_SOCKET_LOCATION}:/var/run/docker.sock:ro,z
+      - ./logs/vector:/var/log/vector:z
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://vector:9001/health"
+        ]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    command:
+      [
+        "--config",
+        "/etc/vector/vector.yml"
+      ]
+    security_opt:
+      - "label=disable"
 
 volumes:
   db-config:
