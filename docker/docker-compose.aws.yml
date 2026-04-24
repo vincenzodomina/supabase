@@ -42,9 +42,6 @@ services:
       timeout: 10s
       interval: 5s
       retries: 3
-    # depends_on:
-    #   analytics:
-    #     condition: service_healthy
     environment:
       #  Listen on all IPv4 interfaces
       HOSTNAME: "0.0.0.0"
@@ -73,17 +70,6 @@ services:
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
 
-      # LOGFLARE_API_KEY is deprecated
-      LOGFLARE_API_KEY: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
-      LOGFLARE_PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
-      LOGFLARE_PRIVATE_ACCESS_TOKEN: ${LOGFLARE_PRIVATE_ACCESS_TOKEN}
-
-      LOGFLARE_URL: http://analytics:4000
-      NEXT_PUBLIC_ENABLE_LOGS: "true"
-      # Comment to use Big Query backend for analytics
-      NEXT_ANALYTICS_BACKEND_PROVIDER: postgres
-      # Uncomment to use Big Query backend for analytics
-      # NEXT_ANALYTICS_BACKEND_PROVIDER: bigquery
       SNIPPETS_MANAGEMENT_FOLDER: /app/snippets
       EDGE_FUNCTIONS_MANAGEMENT_FOLDER: /app/edge-functions
     volumes:
@@ -172,8 +158,6 @@ services:
         condition: service_started
     #   db:
     #     # Disable this if you are using an external Postgres database
-    #     condition: service_healthy
-    #   analytics:
     #     condition: service_healthy
     environment:
       GOTRUE_API_HOST: 0.0.0.0
@@ -455,36 +439,6 @@ services:
 
     volumes:
       - ./rds-ca.pem:/etc/ssl/certs/rds-ca.pem:ro
-
-  vector:
-    container_name: supabase-vector
-    image: timberio/vector:0.53.0-alpine
-    restart: unless-stopped
-    volumes:
-      - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro,z
-      - ${DOCKER_SOCKET_LOCATION}:/var/run/docker.sock:ro,z
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://vector:9001/health"
-        ]
-      timeout: 5s
-      interval: 5s
-      retries: 3
-    environment:
-      LOGFLARE_PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
-    command:
-      [
-        "--config",
-        "/etc/vector/vector.yml"
-      ]
-    security_opt:
-      - "label=disable"
 
 volumes:
   db-config:
