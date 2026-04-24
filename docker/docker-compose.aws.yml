@@ -107,6 +107,14 @@ services:
     # https://unix.stackexchange.com/a/294837
     entrypoint: bash -c 'eval "echo \"$$(cat ~/temp.yml)\"" > ~/kong.yml && /docker-entrypoint.sh kong docker-start'
 
+  templates-server:
+    container_name: supabase-templates-server
+    image: caddy:2-alpine
+    restart: unless-stopped
+    command: [ "caddy", "file-server", "-r", "/templates", "--listen", ":80" ]
+    volumes:
+      - ./templates:/templates:ro
+
   auth:
     container_name: supabase-auth
     image: supabase/gotrue:v2.185.0
@@ -124,7 +132,9 @@ services:
       timeout: 5s
       interval: 5s
       retries: 3
-    # depends_on:
+    depends_on:
+      templates-server:
+        condition: service_started
     #   db:
     #     # Disable this if you are using an external Postgres database
     #     condition: service_healthy
@@ -167,6 +177,16 @@ services:
       GOTRUE_MAILER_URLPATHS_CONFIRMATION: ${MAILER_URLPATHS_CONFIRMATION}
       GOTRUE_MAILER_URLPATHS_RECOVERY: ${MAILER_URLPATHS_RECOVERY}
       GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: ${MAILER_URLPATHS_EMAIL_CHANGE}
+      GOTRUE_MAILER_TEMPLATES_INVITE: "http://templates-server/invite.html"
+      GOTRUE_MAILER_TEMPLATES_CONFIRMATION: "http://templates-server/confirmation.html"
+      GOTRUE_MAILER_TEMPLATES_RECOVERY: "http://templates-server/recovery.html"
+      GOTRUE_MAILER_TEMPLATES_MAGIC_LINK: "http://templates-server/magic_link.html"
+      GOTRUE_MAILER_TEMPLATES_EMAIL_CHANGE: "http://templates-server/email_change.html"
+      GOTRUE_MAILER_SUBJECTS_CONFIRMATION: ${MAILER_SUBJECTS_CONFIRMATION:-Confirm your signup}
+      GOTRUE_MAILER_SUBJECTS_INVITE: ${MAILER_SUBJECTS_INVITE:-You have been invited}
+      GOTRUE_MAILER_SUBJECTS_RECOVERY: ${MAILER_SUBJECTS_RECOVERY:-Reset Password}
+      GOTRUE_MAILER_SUBJECTS_MAGIC_LINK: ${MAILER_SUBJECTS_MAGIC_LINK:-Magic Link}
+      GOTRUE_MAILER_SUBJECTS_EMAIL_CHANGE: ${MAILER_SUBJECTS_EMAIL_CHANGE:-Email Change}
 
       GOTRUE_MAILER_EXTERNAL_HOSTS: ${GOTRUE_MAILER_EXTERNAL_HOSTS}
 
