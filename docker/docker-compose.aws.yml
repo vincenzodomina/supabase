@@ -19,6 +19,14 @@
 #   for email sending to work.
 # - Added explicit postgres-meta SSL handling for RDS (verify-full, CA bundle mount,
 #   extracted root cert at startup).
+# - Added meta service memory limits to prevent OOM kills. Cap meta's memory so a runaway Node heap can't take down the whole host.
+#   Combined with NODE_OPTIONS in the startup command, V8 is forced to GC well before the cgroup
+#   OOM-killer fires, so meta should stay healthy without restart cycles.
+#   See incident notes 2026-05-18: postgres-meta Node process grew to ~22 GB
+#   virtual / 1 GB+ resident under sustained Studio polling, triggering a
+#   global OOM on the host because no per-container limit was set.
+#   Combined with NODE_OPTIONS in the startup command: Force V8 to GC aggressively before hitting the 1 GiB cgroup cap.
+#   Leaves ~400 MiB headroom for native allocations (pg, pgsql-parser WASM).
 # Upstream changelog since this AWS fork was introduced:
 # - Base fork point is roughly the 2026-01-27 docker stack.
 # - 2026-02-16: upstream changed storage and analytics configuration, including
@@ -421,12 +429,15 @@ services:
   meta:
     container_name: supabase-meta
     image: supabase/postgres-meta:v0.96.3
+    mem_limit: 1g
+    memswap_limit: 1g
     restart: unless-stopped
     # depends_on:
     #   db:
     #     # Disable this if you are using an external Postgres database
     #     condition: service_healthy
     environment:
+      NODE_OPTIONS: "--max-old-space-size=600"
       PG_META_PORT: 8080
       PG_META_DB_HOST: ${POSTGRES_HOST}
       PG_META_DB_PORT: ${POSTGRES_PORT}
