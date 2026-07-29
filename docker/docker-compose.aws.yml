@@ -449,17 +449,6 @@ services:
       # PG_META_DB_URL: "postgres://supabase_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=require&sslrootcert=/etc/ssl/certs/rds-ca.pem"
       CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
 
-    command:
-      - /bin/sh
-      - -c
-      - |
-          export PG_META_DB_SSL_ROOT_CERT="$(awk '
-            /-----BEGIN CERTIFICATE-----/ { in_cert=1 }
-            in_cert { print }
-            /-----END CERTIFICATE-----/ { exit }
-          ' /etc/ssl/certs/rds-ca.pem)"
-          exec node /usr/src/app/dist/server/server.js
-
     volumes:
       - ./rds-ca.pem:/etc/ssl/certs/rds-ca.pem:ro
 
